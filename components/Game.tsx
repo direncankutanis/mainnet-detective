@@ -14,6 +14,7 @@ import {
 } from "@/lib/raiku";
 import { MarkIcon, Mugshot } from "./Mark";
 import CaseClosed from "./CaseClosed";
+import { Mascot } from "./Mascot";
 
 type CaseDef = {
   n: number;
@@ -193,6 +194,7 @@ export default function Game() {
   const [solved, setSolved] = useState<boolean[]>([false, false, false, false, false]);
   const [answers, setAnswers] = useState<string[]>(["", "", "", "", ""]);
   const [wrong, setWrong] = useState<number | null>(null);
+  const [misses, setMisses] = useState<number[]>([0, 0, 0, 0, 0]);
   const [stampKey, setStampKey] = useState<number | null>(null);
   const [startAt, setStartAt] = useState(0);
   const [elapsed, setElapsed] = useState(0);
@@ -219,6 +221,7 @@ export default function Game() {
     setStartAt(Date.now());
     setElapsed(0);
     setEndAt(null);
+    setMisses([0, 0, 0, 0, 0]);
     setScreen("cases");
     setActive(0);
     window.scrollTo({ top: 0 });
@@ -246,6 +249,7 @@ export default function Game() {
       }
     } else {
       setWrong(i);
+      setMisses((m) => m.map((x, j) => (j === i ? x + 1 : x)));
     }
   }
 
@@ -308,6 +312,7 @@ export default function Game() {
               solved={solved[active]}
               answer={answers[active]}
               wrong={wrong === active}
+              misses={misses[active]}
               stamp={stampKey === active}
               headingRef={caseRef}
               onSubmit={(a) => submit(active, a)}
@@ -337,10 +342,18 @@ function Intro({ data, onOpen }: { data: Dataset | null; onOpen: () => void }) {
           of evidence about the Raiku validator on Solana mainnet. Every answer is checked against live data. Close all
           five and you&rsquo;re a Certified Mainnet Detective.
         </p>
-        <button type="button" className="btn primary" onClick={onOpen} disabled={!data}>
-          {data ? "Open the case file →" : "Pulling the file…"}
-        </button>
+        <div className="cta-row">
+          <button type="button" className="btn primary" onClick={onOpen} disabled={!data}>
+            {data ? "Open the case file →" : "Pulling the file…"}
+          </button>
+          {!data && <Mascot kind="shocked" />}
+        </div>
         <p className="fine">Takes about 3 minutes. Keep a second tab open for the explorers.</p>
+        <figure className="exhibit">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/mascot/breakout.webp" width={660} height={600} alt="The Raiku dragon mascot bursting through paper" />
+          <figcaption className="mono">Exhibit A · Suspect spotted on mainnet</figcaption>
+        </figure>
       </div>
 
       <article className="folder">
@@ -389,6 +402,7 @@ function CaseView({
   solved,
   answer,
   wrong,
+  misses,
   stamp,
   headingRef,
   onSubmit,
@@ -400,6 +414,7 @@ function CaseView({
   solved: boolean;
   answer: string;
   wrong: boolean;
+  misses: number;
   stamp: boolean;
   headingRef: React.RefObject<HTMLHeadingElement | null>;
   onSubmit: (a: string) => void;
@@ -477,10 +492,15 @@ function CaseView({
             </form>
           )}
 
+          <div className="feedback-row">
+            {wrong && <Mascot kind={misses >= 3 ? "angry" : "crying"} key={`w${misses}`} />}
+            {solved && <Mascot kind="cook" />}
           <p id={`fb-${c.n}`} className={`feedback${wrong ? " err" : ""}`} aria-live="polite">
             {wrong && "That doesn't match the evidence. Check the clue and look again."}
+            {wrong && misses >= 3 && " Tip: open the explorer link in the clue and read the field it names."}
             {solved && (live ? "Confirmed against live data. Evidence logged." : "Confirmed against the snapshot. Evidence logged.")}
           </p>
+          </div>
 
           {solved && (
             <button ref={nextRef} type="button" className="btn primary" onClick={onNext}>

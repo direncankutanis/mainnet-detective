@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
-    "/api/badge": ["./assets/fonts/**"],
+    "/api/badge": ["./assets/**"],
   },
 };
 

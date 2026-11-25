@@ -53,7 +53,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 validators.app
               </a>
             </p>
-            <p>Built by a community member for the Raiku Mainnet Detective challenge. Not affiliated with Raiku.</p>
+            <p>
+              Built by a community member for the Raiku Mainnet Detective challenge. Not affiliated with Raiku. Mascot art from
+              the Raiku community media kit.
+            </p>
           </div>
         </footer>
       </body>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { countRaikuClients, fmtInt, fmtSol, fmtTime, type Dataset } from "@/lib/raiku";
+import { Mascot } from "./Mascot";
 import { badgeQuery, sanitizeHandle, shareText, type BadgeData } from "@/lib/badge";
 
 type Bonus = { state: "loading" } | { state: "ok"; total: number; raiku: number } | { state: "error" };
@@ -105,6 +106,7 @@ export default function CaseClosed({ data, seconds }: { data: Dataset; seconds: 
               </p>
             </div>
             <div className="stamp-slot big">
+              <Mascot kind="party" />
               <span className="stamp slam verified" role="img" aria-label="Verified">
                 VERIFIED
               </span>

@@ -33,9 +33,19 @@ function fonts() {
   return fontsP;
 }
 
+let partyP: Promise<string> | null = null;
+function partySticker() {
+  if (!partyP) {
+    partyP = readFile(join(process.cwd(), "assets", "mascot", "party.png")).then(
+      (b) => `data:image/png;base64,${b.toString("base64")}`,
+    );
+  }
+  return partyP;
+}
+
 const mono = { fontFamily: "Geist Mono", letterSpacing: "0.06em" } as const;
 
-function Mug({ stamp }: { stamp: string }) {
+function Mug({ stamp, sticker }: { stamp: string; sticker?: string }) {
   const lines = ["6'", "5'", "4'", "3'", "2'"];
   return (
     <div
@@ -92,11 +102,25 @@ function Mug({ stamp }: { stamp: string }) {
       >
         {stamp}
       </div>
+      {sticker ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={sticker} width={118} height={118} style={{ position: "absolute", top: -34, right: -40 }} alt="" />
+      ) : null}
     </div>
   );
 }
 
-function Frame({ tab, children, stamp }: { tab: string; children: React.ReactNode; stamp: string }) {
+function Frame({
+  tab,
+  children,
+  stamp,
+  sticker,
+}: {
+  tab: string;
+  children: React.ReactNode;
+  stamp: string;
+  sticker?: string;
+}) {
   return (
     <div
       style={{
@@ -137,7 +161,7 @@ function Frame({ tab, children, stamp }: { tab: string; children: React.ReactNod
         }}
       >
         <div style={{ display: "flex", flexDirection: "column", width: 660 }}>{children}</div>
-        <Mug stamp={stamp} />
+        <Mug stamp={stamp} sticker={sticker} />
       </div>
       <div
         style={{
@@ -186,7 +210,7 @@ export async function renderBadge(b: BadgeData) {
 
   return new ImageResponse(
     (
-      <Frame tab="CERTIFICATE · CASE CLOSED" stamp="VERIFIED">
+      <Frame tab="CERTIFICATE · CASE CLOSED" stamp="VERIFIED" sticker={await partySticker()}>
         <span style={{ ...mono, fontSize: 16, color: ink(0.6) }}>CERTIFIED MAINNET DETECTIVE</span>
         <span style={{ fontSize: handleSize, fontWeight: 500, color: INK, marginTop: 14, lineHeight: 1.1 }}>
           {handle}
