@@ -11,6 +11,7 @@ export type BadgeData = {
   epoch: number | null;
   commission: number | null;
   stake: number | null; // SOL
+  score: number | null; // 0-100 detective score
 };
 
 type Params = Record<string, string | string[] | undefined> | URLSearchParams;
@@ -57,6 +58,7 @@ export function parseBadge(p: Params): BadgeData {
     epoch: int(get(p, "e"), 0, 1000000),
     commission: num(get(p, "m"), 0, 100),
     stake: int(get(p, "k"), 0, 1_000_000_000),
+    score: int(get(p, "p"), 0, 100),
   };
 }
 
@@ -72,6 +74,7 @@ export function badgeQuery(b: BadgeData): string {
   if (b.epoch !== null) q.set("e", String(b.epoch));
   if (b.commission !== null) q.set("m", String(b.commission));
   if (b.stake !== null) q.set("k", String(Math.round(b.stake)));
+  if (b.score !== null) q.set("p", String(b.score));
   return q.toString();
 }
 
@@ -82,6 +85,17 @@ export function fmtDate(iso: string): string {
   return `${d} ${months[m - 1]} ${y}`;
 }
 
-export function shareText(time: string): string {
-  return `I just verified the @raikucom validator myself on Solana mainnet 🕵️ Certified Mainnet Detective in ${time}. Can you beat it?`;
+export function shareText(time: string, rank?: string, beat?: { handle: string; time: string }): string {
+  const base = `I just verified the @raikucom validator myself on Solana mainnet 🕵️ Certified Mainnet Detective in ${time}`;
+  const r = rank ? ` (rank: ${rank})` : "";
+  const b = beat ? `, beating ${beat.handle}'s ${beat.time}` : "";
+  return `${base}${r}${b}. Can you beat it?`;
+}
+
+/** Link that starts a new game with this badge's time as the target. */
+export function challengeQuery(b: BadgeData): string {
+  const q = new URLSearchParams();
+  if (b.handle) q.set("vs", b.handle);
+  q.set("vt", String(b.time));
+  return q.toString();
 }

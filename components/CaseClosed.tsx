@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { countRaikuClients, fmtInt, fmtSol, fmtTime, type Dataset } from "@/lib/raiku";
 import { Mascot } from "./Mascot";
 import { badgeQuery, sanitizeHandle, shareText, type BadgeData } from "@/lib/badge";
+import { isCleanSweep, rankFor, type Challenge } from "@/lib/rank";
 
 type Bonus = { state: "loading" } | { state: "ok"; total: number; raiku: number } | { state: "error" };
 
@@ -11,9 +12,25 @@ function todayUTC(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function CaseClosed({ data, seconds }: { data: Dataset; seconds: number }) {
+export default function CaseClosed({
+  data,
+  seconds,
+  score,
+  challenge,
+}: {
+  data: Dataset;
+  seconds: number;
+  score: number;
+  challenge: Challenge | null;
+}) {
   const { v, bs } = data;
   const time = fmtTime(seconds);
+  const rank = rankFor(score);
+  const clean = isCleanSweep(score);
+  const mySecs = Math.floor(seconds);
+  const beat = challenge ? mySecs < challenge.time : false;
+  const diff = challenge ? Math.abs(challenge.time - mySecs) : 0;
+  const gap = diff >= 60 ? fmtTime(diff) : `${diff}s`;
   const [bonus, setBonus] = useState<Bonus>({ state: "loading" });
   const [handleInput, setHandleInput] = useState("");
   const [badge, setBadge] = useState<BadgeData | null>(null);
@@ -45,6 +62,7 @@ export default function CaseClosed({ data, seconds }: { data: Dataset; seconds: 
       epoch: bs[0]?.epoch ?? null,
       commission: v.commission,
       stake: Math.round(v.activated_stake),
+      score,
     });
     setStatus("");
   }
@@ -53,7 +71,14 @@ export default function CaseClosed({ data, seconds }: { data: Dataset; seconds: 
   const shareUrl = badge ? `${origin}/b?${q}` : "";
   const imgUrl = badge ? `/api/badge?${q}` : "";
   const tweetUrl = badge
-    ? `https://x.com/intent/tweet?${new URLSearchParams({ text: shareText(time), url: shareUrl })}`
+    ? `https://x.com/intent/tweet?${new URLSearchParams({
+        text: shareText(
+          time,
+          rank,
+          beat && challenge ? { handle: challenge.handle, time: fmtTime(challenge.time) } : undefined,
+        ),
+        url: shareUrl,
+      })}`
     : "";
 
   async function download() {
@@ -112,6 +137,28 @@ export default function CaseClosed({ data, seconds }: { data: Dataset; seconds: 
               </span>
             </div>
           </div>
+
+          <div className="rank-card">
+            <div>
+              <p className="mono label">Detective rank</p>
+              <p className="rank-name">{rank}</p>
+            </div>
+            <div>
+              <p className="mono label">Score</p>
+              <p className="rank-name">{score}/100</p>
+            </div>
+            {clean && <span className="mini-stamp mono">Clean sweep</span>}
+          </div>
+
+          {challenge && (
+            <p className={`challenge-result${beat ? " won" : ""}`} aria-live="polite">
+              {beat
+                ? `You beat ${challenge.handle}'s ${fmtTime(challenge.time)} by ${gap}.`
+                : diff === 0
+                  ? `Dead heat with ${challenge.handle}: ${fmtTime(challenge.time)}.`
+                  : `${challenge.handle} still leads by ${gap} (${fmtTime(challenge.time)}). Play again?`}
+            </p>
+          )}
 
           <dl className="evidence summary">
             <div>
@@ -213,7 +260,10 @@ export default function CaseClosed({ data, seconds }: { data: Dataset; seconds: 
               <p className="feedback" aria-live="polite">
                 {status}
               </p>
-              <p className="fine">Tag @raikucom when you post. Your link unfurls on X as this badge.</p>
+              <p className="fine">
+                Tag @raikucom when you post. Your link unfurls on X as this badge, and anyone who opens it gets your time as
+                the target to beat.
+              </p>
             </>
           )}
         </div>

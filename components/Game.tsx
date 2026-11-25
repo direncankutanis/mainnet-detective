@@ -15,6 +15,7 @@ import {
 import { MarkIcon, Mugshot } from "./Mark";
 import CaseClosed from "./CaseClosed";
 import { Mascot } from "./Mascot";
+import { computeScore, parseChallenge, type Challenge } from "@/lib/rank";
 
 type CaseDef = {
   n: number;
@@ -23,9 +24,19 @@ type CaseDef = {
   choices?: string[];
   unit?: string;
   check: (answer: string) => boolean;
-  clue: ReactNode;
+  where: ReactNode; // free pointer to the explorer
+  clue: ReactNode; // detailed hint, costs points
+  taunt: string; // suspect line before solving
+  confess: string; // suspect line after solving
   evidence: [string, string][];
 };
+
+const WRONG_TAUNTS = [
+  "Hah! Wrong trail, detective.",
+  "Cold. Very cold.",
+  "Is that your final answer? Because it's wrong.",
+  "Nice try. The explorer says otherwise.",
+];
 
 const DECOYS = ["Amsterdam", "Tokyo", "New York", "Singapore"];
 
@@ -80,6 +91,9 @@ function buildCases(d: Dataset, cityChoices: string[]): CaseDef[] {
   return [
     {
       n: 1,
+      where: <>Find it on <Ext href={STAKEWIZ_URL}>StakeWiz</Ext>.</>,
+      taunt: "Client? I could be running anything. Prove it.",
+      confess: "Fine. It’s on the record. You got me.",
       question: "Which client is this validator running?",
       kind: "choice",
       choices: ["Agave", "Jito", "Firedancer", "Raiku"],
@@ -97,6 +111,9 @@ function buildCases(d: Dataset, cityChoices: string[]): CaseDef[] {
     },
     {
       n: 2,
+      where: <>Find it on <Ext href={VALIDATORS_APP_URL}>validators.app</Ext>.</>,
+      taunt: "Skipped slots? Me? Catch me if you can.",
+      confess: "Busted. The block log doesn’t lie.",
       question: "How many of its slots has it skipped this epoch?",
       kind: "number",
       unit: "slots",
@@ -116,6 +133,9 @@ function buildCases(d: Dataset, cityChoices: string[]): CaseDef[] {
     },
     {
       n: 3,
+      where: <>Find it on <Ext href={STAKEWIZ_URL}>StakeWiz</Ext>.</>,
+      taunt: "My fee is a secret. Probably.",
+      confess: "Alright, alright. That’s my fee.",
       question: "What commission does it charge stakers?",
       kind: "number",
       unit: "%",
@@ -133,6 +153,9 @@ function buildCases(d: Dataset, cityChoices: string[]): CaseDef[] {
     },
     {
       n: 4,
+      where: <>Find it on <Ext href={VALIDATORS_APP_URL}>validators.app</Ext>.</>,
+      taunt: "Where am I hiding? Somewhere on planet Earth.",
+      confess: "You found my hideout.",
       question: "Which city is the server in?",
       kind: "choice",
       choices: cityChoices,
@@ -150,6 +173,9 @@ function buildCases(d: Dataset, cityChoices: string[]): CaseDef[] {
     },
     {
       n: 5,
+      where: <>Find it on <Ext href={STAKEWIZ_URL}>StakeWiz</Ext>.</>,
+      taunt: "How much stake? More than you think. Or less.",
+      confess: "Okay. That’s all my stake. Happy now?",
       question: "Roughly how much SOL is staked to it?",
       kind: "choice",
       choices: buckets,
@@ -195,6 +221,8 @@ export default function Game() {
   const [answers, setAnswers] = useState<string[]>(["", "", "", "", ""]);
   const [wrong, setWrong] = useState<number | null>(null);
   const [misses, setMisses] = useState<number[]>([0, 0, 0, 0, 0]);
+  const [hints, setHints] = useState<boolean[]>([false, false, false, false, false]);
+  const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [stampKey, setStampKey] = useState<number | null>(null);
   const [startAt, setStartAt] = useState(0);
   const [elapsed, setElapsed] = useState(0);
@@ -203,6 +231,7 @@ export default function Game() {
   const caseRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
+    setChallenge(parseChallenge(window.location.search));
     loadData().then((d) => {
       setData(d);
       setCityChoices(sessionCityChoices(cityShort(d.v.ip_city)));
@@ -222,6 +251,7 @@ export default function Game() {
     setElapsed(0);
     setEndAt(null);
     setMisses([0, 0, 0, 0, 0]);
+    setHints([false, false, false, false, false]);
     setScreen("cases");
     setActive(0);
     window.scrollTo({ top: 0 });
@@ -260,6 +290,10 @@ export default function Game() {
   }
 
   const solvedCount = solved.filter(Boolean).length;
+  const score = computeScore(
+    misses.reduce((a, b) => a + b, 0),
+    hints.filter(Boolean).length,
+  );
 
   return (
     <>
@@ -278,7 +312,7 @@ export default function Game() {
       </header>
 
       <main className="wrap main">
-        {screen === "intro" && <Intro data={data} onOpen={open} />}
+        {screen === "intro" && <Intro data={data} onOpen={open} challenge={challenge} />}
 
         {screen === "cases" && cases.length > 0 && (
           <section aria-labelledby="case-heading">
@@ -302,7 +336,7 @@ export default function Game() {
                 })}
               </nav>
               <span className="timer mono" aria-label={`Time ${fmtTime(elapsed)}`}>
-                {fmtTime(elapsed)} · {solvedCount}/5
+                {fmtTime(elapsed)} · {solvedCount}/5 · {score} pts
               </span>
             </div>
 
@@ -313,6 +347,8 @@ export default function Game() {
               answer={answers[active]}
               wrong={wrong === active}
               misses={misses[active]}
+              hint={hints[active]}
+              onHint={() => setHints((h) => h.map((x, j) => (j === active ? true : x)))}
               stamp={stampKey === active}
               headingRef={caseRef}
               onSubmit={(a) => submit(active, a)}
@@ -323,24 +359,37 @@ export default function Game() {
           </section>
         )}
 
-        {screen === "closed" && data && <CaseClosed data={data} seconds={elapsed} />}
+        {screen === "closed" && data && <CaseClosed data={data} seconds={elapsed} score={score} challenge={challenge} />}
       </main>
     </>
   );
 }
 
-function Intro({ data, onOpen }: { data: Dataset | null; onOpen: () => void }) {
+function Intro({
+  data,
+  onOpen,
+  challenge,
+}: {
+  data: Dataset | null;
+  onOpen: () => void;
+  challenge: Challenge | null;
+}) {
   const ep = data?.epochInfo;
   const pct = ep ? Math.min(100, Math.round((ep.elapsed_seconds / ep.duration_seconds) * 100)) : null;
   return (
     <div className="grid intro">
       <div className="intro-copy">
+        {challenge && (
+          <p className="challenge mono">
+            Challenge · beat {challenge.handle}&rsquo;s time of {fmtTime(challenge.time)}
+          </p>
+        )}
         <p className="kicker mono">Mainnet Detective · 5 cases</p>
         <h1>Raiku says its validator is live. Prove it.</h1>
         <p className="lead">
           Don&rsquo;t take anyone&rsquo;s word for it. Each case sends you to StakeWiz or validators.app to find one piece
-          of evidence about the Raiku validator on Solana mainnet. Every answer is checked against live data. Close all
-          five and you&rsquo;re a Certified Mainnet Detective.
+          of evidence about the Raiku validator on Solana mainnet. Every answer is checked against the data. You start
+          with 100 points: a wrong answer costs 10, a hint costs 5. Close all five to earn your detective rank.
         </p>
         <div className="cta-row">
           <button type="button" className="btn primary" onClick={onOpen} disabled={!data}>
@@ -403,6 +452,8 @@ function CaseView({
   answer,
   wrong,
   misses,
+  hint,
+  onHint,
   stamp,
   headingRef,
   onSubmit,
@@ -415,6 +466,8 @@ function CaseView({
   answer: string;
   wrong: boolean;
   misses: number;
+  hint: boolean;
+  onHint: () => void;
   stamp: boolean;
   headingRef: React.RefObject<HTMLHeadingElement | null>;
   onSubmit: (a: string) => void;
@@ -439,9 +492,34 @@ function CaseView({
             {c.question}
           </h2>
 
+          <div className="suspect" aria-live="polite">
+            <Mascot
+              kind={solved ? "crying" : wrong ? (misses >= 3 ? "cook" : "angry") : "shocked"}
+              key={solved ? "s" : wrong ? `w${misses}` : "i"}
+              size={64}
+            />
+            <p className="bubble">
+              <span className="mono bubble-who">Suspect</span>
+              {solved
+                ? c.confess
+                : wrong
+                  ? misses >= 3
+                    ? "Let me cook… while you keep guessing."
+                    : WRONG_TAUNTS[(misses - 1) % WRONG_TAUNTS.length]
+                  : c.taunt}
+            </p>
+          </div>
+
           <div className="clue">
-            <p className="mono label">Clue</p>
-            <p>{c.clue}</p>
+            <p className="mono label">Where to look</p>
+            <p>{c.where}</p>
+            {hint || solved ? (
+              <p className="hint-text">{c.clue}</p>
+            ) : (
+              <button type="button" className="hint-btn" onClick={onHint}>
+                Show hint (−5 pts)
+              </button>
+            )}
           </div>
 
           {c.kind === "choice" ? (
@@ -493,8 +571,6 @@ function CaseView({
           )}
 
           <div className="feedback-row">
-            {wrong && <Mascot kind={misses >= 3 ? "angry" : "crying"} key={`w${misses}`} />}
-            {solved && <Mascot kind="cook" />}
           <p id={`fb-${c.n}`} className={`feedback${wrong ? " err" : ""}`} aria-live="polite">
             {wrong && "That doesn't match the evidence. Check the clue and look again."}
             {wrong && misses >= 3 && " Tip: open the explorer link in the clue and read the field it names."}

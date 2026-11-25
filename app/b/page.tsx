@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { badgeQuery, parseBadge } from "@/lib/badge";
+import { badgeQuery, challengeQuery, parseBadge } from "@/lib/badge";
+import { rankFor } from "@/lib/rank";
 import { fmtTime } from "@/lib/raiku";
 
 type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
@@ -9,7 +10,8 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   const img = `/api/badge?${badgeQuery(b)}`;
   const who = b.handle || "A detective";
   const title = `${who} is a Certified Mainnet Detective`;
-  const description = `Verified the Raiku validator on Solana mainnet in ${fmtTime(b.time)}. Can you beat it?`;
+  const rank = b.score !== null ? ` Rank: ${rankFor(b.score)}.` : "";
+  const description = `Verified the Raiku validator on Solana mainnet in ${fmtTime(b.time)}.${rank} Can you beat it?`;
   return {
     title,
     description,
@@ -34,15 +36,21 @@ export default async function BadgePage({ searchParams }: Props) {
         <article className="folder">
           <div className="folder-tab mono">CERTIFICATE</div>
           <div className="folder-body">
-            <p className="kicker mono">Case closed · {fmtTime(b.time)}</p>
+            <p className="kicker mono">
+              Case closed · {fmtTime(b.time)}
+              {b.score !== null ? ` · ${rankFor(b.score)} · ${b.score}/100` : ""}
+            </p>
             <h1>{b.handle || "A detective"} verified the Raiku validator.</h1>
             <div className="badge-preview">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={img} width={1200} height={675} alt={`Certified Mainnet Detective badge, solved in ${fmtTime(b.time)}`} />
             </div>
             <div className="actions">
-              <a className="btn primary" href="/">
-                Play it yourself →
+              <a className="btn primary" href={`/?${challengeQuery(b)}`}>
+                Beat {fmtTime(b.time)} →
+              </a>
+              <a className="btn" href="/">
+                Play it yourself
               </a>
             </div>
             <p className="fine">Five cases. Real mainnet data. Don&rsquo;t trust, verify.</p>

@@ -4,6 +4,7 @@ import { ImageResponse } from "next/og";
 import { MARK_VIEWBOX, halftoneDots } from "./mark";
 import { fmtDate, type BadgeData } from "./badge";
 import { fmtInt, fmtSol, fmtTime } from "./raiku";
+import { isCleanSweep, rankFor } from "./rank";
 
 const PAPER = "#EFEEE9";
 const SHEET = "#F6F5F1";
@@ -220,6 +221,22 @@ export async function renderBadge(b: BadgeData) {
         </span>
         {b.date ? (
           <span style={{ ...mono, fontSize: 16, color: ink(0.6), marginTop: 12 }}>{fmtDate(b.date).toUpperCase()}</span>
+        ) : null}
+        {b.score !== null ? (
+          <div style={{ display: "flex", marginTop: 18 }}>
+            <span
+              style={{
+                ...mono,
+                fontSize: 18,
+                fontWeight: 500,
+                color: SHEET,
+                background: INK,
+                padding: "7px 14px 5px",
+              }}
+            >
+              {`${rankFor(b.score).toUpperCase()} · ${b.score}/100${isCleanSweep(b.score) ? " · CLEAN SWEEP" : ""}`}
+            </span>
+          </div>
         ) : null}
         <div style={{ display: "flex", flexDirection: "column", marginTop: "auto" }}>
           {rows.map(([k, v]) => (
